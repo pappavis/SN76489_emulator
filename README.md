@@ -13,7 +13,7 @@ It runs as a **single Python file** (`sn76489_emulator.py`) and outputs audio di
 - a reference implementation for later hardware bridging (real SN76489 chips).
 
 
-<img src="./img/sn76489_kat_intro.jpg" alt="sn76489_kat_intro">
+<img src="./img/sn76489_kat_intro.jpg" alt="sn76489_kat_intro" width="30%" height="30%">
 
 ## Who is this for?
 
