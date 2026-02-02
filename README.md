@@ -1,4 +1,4 @@
-# SN76489 Emulator (Python) — v0.06
+# SN76489 Emulator (***Python***)
 
 A small, test-driven audio engine that emulates the classic SN76489 sound chip on macOS?win?Raspberry Pi and plays chip-music (VGM) and live MIDI with deterministic, repeatable behavior.
 
