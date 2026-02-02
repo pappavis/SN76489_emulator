@@ -92,7 +92,7 @@ pip install numpy sounddevice python-rtmidi
 brew install portaudio
 ```
 
-# Quick start
+# Smoke testing / Quick start
 ## Beep
 ```bash
 python sn76489_emulator.py --test beep
