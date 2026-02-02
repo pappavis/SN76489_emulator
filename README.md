@@ -168,7 +168,7 @@ Before playback starts, the emulator prints a stable multi-line RUN CONFIG: bloc
 This provides “visual verification” and supports regression snapshots.
 
 # How this was built (development cycle)
-<img src="./img/Ontwikkel_siklus.jpg" width="70%" height="70%">
+<img src="./img/Ontwikkel_siklus.jpg" width="40%" height="40%">
 This project was built with a deliberate iterative loop:
 ##	1.	Idea / need
 	•	Fast SN76489 emulation with real register behavior
