@@ -1,8 +1,6 @@
-# SN76489 Emulator (Python, macOS) — v0.06
+# SN76489 Emulator (Python) — v0.06
 
-**One-liner (manager-level):** A small, test-driven audio engine that emulates the classic SN76489 sound chip on macOS and plays chip-music (VGM) and live MIDI with deterministic, repeatable behavior.
-
----
+A small, test-driven audio engine that emulates the classic SN76489 sound chip on macOS?win?Raspberry Pi and plays chip-music (VGM) and live MIDI with deterministic, repeatable behavior.
 
 ## What is this?
 
@@ -14,7 +12,8 @@ It runs as a **single Python file** (`sn76489_emulator.py`) and outputs audio di
 - a playable chip-synth engine (tests + MIDI input), and
 - a reference implementation for later hardware bridging (real SN76489 chips).
 
----
+
+<img src="./img/sn76489_kat_intro.jpg" alt="sn76489_kat_intro">
 
 ## Who is this for?
 
@@ -183,7 +182,7 @@ This project was built with a deliberate iterative loop:
 
 ##	4.	Test harness
 	•	Beep/noise/sequence/chords/sweep tests + counters + dumps
-    
+
 ##	5.	Release
 	•	Known-good tagged states, rollback-friendly
 	•	v0.06 adds stable VGM playback + strict debug contracts
