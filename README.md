@@ -20,7 +20,7 @@ It runs as a **single Python file** (`sn76489_emulator.py`) and outputs audio di
 - **Retro audio / chiptune builders** who want to play or validate SN76489 behavior quickly.
 - **Developers** who want a clean baseline to compare against other implementations (including Copilot-generated code).
 - **Hardware hobbyists** building SN76489 synth hardware and needing a “golden” reference engine.
-- **DAW users** (Logic / Ableton on macOS) who want to drive SN76489-style sound via MIDI input.
+- **DAW users** (Logic / Ableton) who want to drive SN76489-style sound via MIDI input.
 
 ---
 
@@ -71,7 +71,7 @@ VGM CLI:
 
 ---
 
-## Installation (macOS 26.2 / Python 3.12)
+## Installation (Python 3.12)
 
 ### 1) Create venv
 ```bash
@@ -85,7 +85,7 @@ pip install -U pip
 pip install numpy sounddevice python-rtmidi
 ```
 
-MacOS if sounddevice fails due to PortAudio:
+***MacOS*** if sounddevice fails due to PortAudio:
 ```bash
 brew install portaudio
 ```
@@ -168,7 +168,7 @@ Before playback starts, the emulator prints a stable multi-line RUN CONFIG: bloc
 This provides “visual verification” and supports regression snapshots.
 
 # How this was built (development cycle)
-
+<img src="./img/Ontwikkel_siklus.jpg" width="70%" height="70%">
 This project was built with a deliberate iterative loop:
 ##	1.	Idea / need
 	•	Fast SN76489 emulation with real register behavior
