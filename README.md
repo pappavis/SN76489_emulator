@@ -8,7 +8,7 @@ This project is a **software emulator** of the **SN76489 PSG (Programmable Sound
 
 It runs as a **single Python file** (`sn76489_emulator.py`) and outputs audio directly to your Mac speakers.
 
-<img src="./img/sn76489_banner1.jpg" alt="sn76489_kat_intro" width="30%" height="30%">
+<img src="./img/sn76489_banner1.jpg" alt="sn76489_kat_banner" width="30%" height="30%">
 
 **Key idea:** all audio is produced via **SN76489-style register writes** (no “shortcut” oscillators). This makes the emulator useful as both:
 - a playable chip-synth engine (tests + MIDI input), and
