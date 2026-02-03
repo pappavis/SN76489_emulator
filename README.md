@@ -4,6 +4,10 @@
 
 This document demonstrates that a **non-trivial Python application** — in this case a full SN76489 sound chip emulator — can be built **purely from structured text**, without writing code by hand.
 
+No Python knowledge is required to follow the process.
+
+<img src="./img/sn76489_banner1.jpg" width="40%" height="40%">
+
 The key is not “AI magic”, but **disciplined specification**:
 - clear functional intent
 - explicit technical contracts
@@ -28,15 +32,17 @@ Public release: **v0.06**
 Repository:  
 https://github.com/pappavis/SN76489_emulator
 
+# Idea to release in 5 hours
+<img src="./img/Ontwikkel_siklus.jpg" width="40%" height="40%">
 ---
 
 ## Audience
 
 This HOWTO is intended for:
-- engineers curious about AI-assisted development
+- ***engineers*** curious about AI-assisted development
 - technical managers evaluating LLM productivity claims
 - architects interested in specification-first workflows
-- hardware/software hobbyists validating emulation concepts
+- hardware/software ***hobbyists*** validating emulation concepts
 
 No Python knowledge is required to follow the process.
 
@@ -153,4 +159,4 @@ See the main repository <a href="./docs/quick_setup_install.md">README</a> for t
 
 # Credits
  - Idea, execution: Michiel Erasmus
- 
+
