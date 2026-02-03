@@ -68,9 +68,7 @@ Open any modern LLM, for example:
 
 ### 2. Provide the technical contract
 Copy-paste the full contents of:
-<a href="./docs/02 Technische specs.md" target="./blank">docs/02_Technical_Specification.md</a>
-
-into the chat window.
+<a href="./docs/02 Technische specs.md" target="./blank">docs/02_Technical_Specification.md</a> into the chat window.
 
 Do **not** summarize it.  
 Do **not** paraphrase it.
