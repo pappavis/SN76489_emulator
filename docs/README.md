@@ -2,6 +2,7 @@
 
 This document illustrates how a complex Python emulator can be generated from structured technical specifications using Large Language Models (LLMs), without manual coding.
 
+<img src="./img/sn76489_howto_run.jpg" width="50%" height="50%">
 
 1. ***Open*** your favourite LLM/AI such as ***<a href="https://m365.cloud.microsoft/chat/?auth=2" target="_blank">Copilot</a>***, ChatGPT or <a href="https://gemini.google.com" target="_blank">gemini</a>.
 2. ***Copy paste*** the full text of <a href="./02 Technische specs.md" alt="Technische specs">02 Technische specs.md</a> to a LLM chat window.

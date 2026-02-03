@@ -32,8 +32,6 @@ Public release: **v0.06**
 Repository:  
 https://github.com/pappavis/SN76489_emulator
 
-# Idea to release in 5 hours
-<img src="./img/Ontwikkel_siklus.jpg" width="40%" height="40%">
 ---
 
 ## Audience
@@ -112,6 +110,8 @@ This project was completed in **one evening**:
 
 Total elapsed time: **~5 hours**
 
+<img src="./img/Ontwikkel_siklus.jpg" width="40%" height="40%">
+
 ---
 
 ## Why this matters
@@ -156,6 +156,10 @@ Possible follow-ups include:
 
 See the main repository <a href="./docs/quick_setup_install.md">README</a> for the current roadmap.
 ```
+
+<img src="./img/sn76489_howto_run.jpg" width="50%" height="50%">
+
+
 
 # Credits
  - Idea, execution: Michiel Erasmus
