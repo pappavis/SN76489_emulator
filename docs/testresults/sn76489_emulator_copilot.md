@@ -103,7 +103,7 @@ git commit -m "v0.07: add instrument profiles, velocity curves, voice-alloc mode
 ## Bronne / Verwysings
 
 *   Jou **FS v1.6** (hierdie gesprek) — primêre kontrak vir v0.07.
-*   Interne konteks (Teams) oor jou SN76489-werk en repo-skakels wat die projekkonteks bevestig: “Retro chip synths from 1980 in Python” (Teams-boodskappe; interne verwysings). [\[us-prod.as...rosoft.com\]](https://us-prod.asyncgw.teams.microsoft.com/v1/objects/0-wus-d6-442c0e21afe20a59054cf20682fb4b74/views/original/sn76489_emulator.py), [\[us-prod.as...rosoft.com\]](https://us-prod.asyncgw.teams.microsoft.com/v1/objects/0-wus-d11-77660fb21ecd12bdc20d16cf40d494a4/views/original/README_v0_07.md), [\[Fun Stuff | Teams\]](https://teams.microsoft.com/l/message/19:2729154d04cc4b3d96d1491fba952a57@thread.skype/1770069501335?tenantId=e3b48527-4cbe-42a2-b4d2-11b3cc7a86fc&groupId=ffa3f3cf-8a3a-46e1-a7ff-0bb41b1be8f7&parentMessageId=1770069501335&teamName=Global%20IT%20Operations&channelName=Fun%20Stuff&createdTime=1770069501335), [\[Erasmus, M...el in chat | Teams\]](https://teams.microsoft.com/l/message/19:2d408c5a-e28e-4386-b5ae-9e3d0c386df5_913b7ce0-89c5-499d-9163-75709da2a874@unq.gbl.spaces/1770069026698?context=%7B%22contextType%22:%22chat%22%7D)
+*   Interne konteks 
 
 > Artefakte geskep met die Copilot Python-omgewing:
 >
