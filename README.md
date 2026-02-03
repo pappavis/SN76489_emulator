@@ -76,9 +76,10 @@ Do **not** paraphrase it.
 ### 3. Request implementation
 
 After pasting, enter:
-<i>Build sn76489_emulator.py immediately, exactly according to this specification.</i>
-
 ```bash
+Build sn76489_emulator.py immediately, exactly according to this specification.
+```
+
 Wait for the code to be generated.
 
 ### 4. Run the result
@@ -153,7 +154,6 @@ Possible follow-ups include:
 - bridging the emulator to real SN76489 hardware
 
 See the main repository <a href="./docs/quick_setup_install.md">README</a> for the current roadmap.
-```
 
 <img src="./img/sn76489_howto_run.jpg" width="50%" height="50%">
 
