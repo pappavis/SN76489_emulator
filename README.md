@@ -1,202 +1,156 @@
-# SN76489 Emulator (***Python***)
+# HOWTO — Build a Complex Emulator with (Almost) Zero Coding
 
-A small, test-driven audio engine that emulates the classic SN76489 sound chip on macOS?win?Raspberry Pi and plays chip-music (VGM) and live MIDI with deterministic, repeatable behavior.
+## Executive summary
 
-## What is this?
+This document demonstrates that a **non-trivial Python application** — in this case a full SN76489 sound chip emulator — can be built **purely from structured text**, without writing code by hand.
 
-This project is a **software emulator** of the **SN76489 PSG (Programmable Sound Generator)** — the classic 8-bit era sound chip found in multiple retro systems.
+The key is not “AI magic”, but **disciplined specification**:
+- clear functional intent
+- explicit technical contracts
+- deterministic tests
+- controlled iteration
 
-It runs as a **single Python file** (`sn76489_emulator.py`) and outputs audio directly to your Mac speakers.
-
-<img src="./img/sn76489_banner1.jpg" alt="sn76489_kat_banner" width="30%" height="30%">
-
-**Key idea:** all audio is produced via **SN76489-style register writes** (no “shortcut” oscillators). This makes the emulator useful as both:
-- a playable chip-synth engine (tests + MIDI input), and
-- a reference implementation for later hardware bridging (real SN76489 chips).
-
-
-<img src="./img/sn76489_kat_intro.jpg" alt="sn76489_kat_intro" width="30%" height="30%">
-
-## Who is this for?
-
-- **Retro audio / chiptune builders** who want to play or validate SN76489 behavior quickly.
-- **Developers** who want a clean baseline to compare against other implementations (including Copilot-generated code).
-- **Hardware hobbyists** building SN76489 synth hardware and needing a “golden” reference engine.
-- **DAW users** (Logic / Ableton) who want to drive SN76489-style sound via MIDI input.
+Large Language Models (LLMs) are used **only** as implementation accelerators.
 
 ---
 
-## Features (v0.06)
+## What was built
 
-### SN76489 core + engine
-- SN76489 emulation: **3 tone channels + 1 noise channel**
-- Noise modes: **white / periodic**
-- Noise rate selection: `div16 | div32 | div64 | tone2`
-- Deterministic noise seed support for regression checks
-- Mixer with `--master-gain`
-- Stereo routing: `--pan left|right|both`
-- Multi-chip engine: `--chips 1..128`
+A fully working **SN76489 PSG emulator** in Python, featuring:
+- audio output
+- MIDI input
+- VGM file playback
+- deterministic debug & regression tooling
 
-### Runtime modes (CLI-first)
-- Tests:
-  - `--test beep`
-  - `--test noise`
-  - `--test sequence`
-  - `--test chords`
-  - `--test sweep`
-- Debug / inspection:
-  - `--dump-regs` (stable “golden output” format)
-  - `--counters` (chip + voice + VGM metrics)
-  - `--debug` (rate-limited trace)
-- **RUN CONFIG** parameter echo block (always printed before playback modes)
+All functionality lives in **one Python file** and runs on macOS.
 
-### MIDI (macOS)
-- Live MIDI input via CoreMIDI (through `python-rtmidi`)
-- MIDI channel → chip mapping (wraps by modulo chips)
-- Supported events:
-  - Note On / Note Off
-  - Velocity → 4-bit volume mapping
-  - Pitch Bend (±2 semitone)
-  - CC64 sustain (basic)
-
-### VGM playback (macOS)
-Plays `.vgm` files using a strict supported command subset:
-- PSG write: `0x50 dd`
-- Wait: `0x61 nn nn`, `0x62`, `0x63`, `0x70..0x7F`
-- End: `0x66`
-
-VGM CLI:
-- `--vgm-list`
-- `--vgm-path <file>`
-- `--vgm-loop`
-- `--vgm-speed <factor>`
+Public release: **v0.06**  
+Repository:  
+https://github.com/pappavis/SN76489_emulator
 
 ---
 
-## Installation (Python 3.12)
+## Audience
 
-### 1) Create venv
+This HOWTO is intended for:
+- engineers curious about AI-assisted development
+- technical managers evaluating LLM productivity claims
+- architects interested in specification-first workflows
+- hardware/software hobbyists validating emulation concepts
+
+No Python knowledge is required to follow the process.
+
+---
+
+## The core idea
+
+> If you can describe a system precisely enough,  
+> an AI can implement it — even if you cannot code.
+
+The quality of the output is directly proportional to:
+- the quality of the specifications
+- the clarity of constraints
+- the strictness of acceptance criteria
+
+---
+
+## Step-by-step: reproduce the experiment
+
+### 1. Choose an LLM
+Open any modern LLM, for example:
+- ChatGPT
+- GitHub Copilot Chat
+- Google Gemini
+
+### 2. Provide the technical contract
+Copy-paste the full contents of:
+<a href="./docs/02 Technische specs.md" target="./blank">docs/02_Technical_Specification.md</a>
+
+into the chat window.
+
+Do **not** summarize it.  
+Do **not** paraphrase it.
+
+### 3. Request implementation
+
+After pasting, enter:
+<i>Build sn76489_emulator.py immediately, exactly according to this specification.</i>
+
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -U pip
+Wait for the code to be generated.
+
+### 4. Run the result
+- Install Python (free, from python.org)
+- Install dependencies as instructed
+- Run the generated script
+
+If the specification was followed correctly:
+- audio will play
+- tests will pass
+- debug output will match the contract
+
+---
+
+## Development cycle (real timeline)
+
+This project was completed in **one evening**:
+
+- **Start:** 2-Feb-2026, 17:30  
+  Initial idea + first functional description
+
+- **Iteration:**  
+  Functional Specs → Technical Specs → Tests → Corrections
+
+- **Public release:** 2-Feb-2026, 22:00  
+  Version v0.06 (VGM playback, MIDI, full debug contracts)
+
+Total elapsed time: **~5 hours**
+
+---
+
+## Why this matters
+
+This experiment shows that:
+- LLMs do not replace engineering thinking
+- They amplify **well-structured reasoning**
+- Poor specs lead to poor code, regardless of AI
+
+In other words:
+> The bottleneck is no longer typing speed —  
+> it is clarity of thought.
+
+---
+
+## Key takeaways
+
+- Text **is** an executable artifact when structured correctly
+- Specifications are more valuable than code
+- AI works best when treated as a compiler, not an author
+- Rollback, tests and determinism still matter
+
+---
+
+## What this is *not*
+
+- Not a claim that “anyone can code anything instantly”
+- Not a replacement for engineering judgement
+- Not an endorsement of unreviewed AI output
+
+Human intent remains the controlling factor.
+
+---
+
+## Next directions
+
+Possible follow-ups include:
+- expanding the specification to new features
+- comparing multiple AI implementations against the same spec
+- applying the method to non-audio domains
+- bridging the emulator to real SN76489 hardware
+
+See the main repository <a href="./docs/quick_setup_install.md">README</a> for the current roadmap.
 ```
 
-2) Audio dependencies
-```bash
-pip install numpy sounddevice python-rtmidi
-```
-
-***MacOS*** if sounddevice fails due to PortAudio:
-```bash
-brew install portaudio
-```
-
-# Smoke testing / Quick start
-## Beep
-```bash
-python sn76489_emulator.py --test beep
-```
-
-## 2) Multi-chip + panning sanity
-```bash
-python sn76489_emulator.py --test beep --chips 2 --pan left
-python sn76489_emulator.py --test beep --chips 2 --pan right
-```
-
-## 3) Noise determinism check (run twice, should sound identical)
-```bash
-python sn76489_emulator.py --test noise --noise-mode white --noise-rate div32 --noise-seed 0x4000
-python sn76489_emulator.py --test noise --noise-mode white --noise-rate div32 --noise-seed 0x4000
-```
-
-## 4) Play VGM
-
-### List directory:
-```bash
-python sn76489_emulator.py --vgm-list --vgm-base-dir "/path/to/vgm/dir"
-```
-
-### Play once:
-```bash
-python sn76489_emulator.py --vgm-path "/path/to/song.vgm"
-```
-
-### Loop + speed:
-```bash
-python sn76489_emulator.py --vgm-path "/path/to/song.vgm" --vgm-loop --vgm-speed 1.0
-```
-
-### With counters + registers:
-```bash
-python sn76489_emulator.py --vgm-path "/path/to/song.vgm" --counters --dump-regs
-```
-
-### 5) MIDI (optional)
-List ports:
-```bash
-python sn76489_emulator.py --midi-list
-```
-
-
-Auto-open port 0:
-```bash
-python sn76489_emulator.py --midi-in --chips 2 --pan both --master-gain 0.25
-```
-
-Choose a port by substring:
-```bash
-python sn76489_emulator.py --midi-in --midi-port "IAC" --chips 1
-```
-
-## Operational contract (important)
-
-### Mutual exclusivity (hard fail)
-
-These modes are mutually exclusive:
-	•	--test ...
-	•	--midi-in
-	•	--vgm-path ...
-	•	--vgm-list
-	•	--midi-list
-
-If you combine exclusive modes, the program exits with:
-	•	ERROR: ...
-	•	exit code 2
-
-RUN CONFIG echo
-
-Before playback starts, the emulator prints a stable multi-line RUN CONFIG: block that echoes effective parameters.
-This provides “visual verification” and supports regression snapshots.
-
-# How this was built (development cycle)
-<img src="./img/Ontwikkel_siklus.jpg" width="40%" height="40%">
-
-This project was built with a deliberate iterative loop:
-
-##	1.	Idea / need
-	•	Fast SN76489 emulation with real register behavior
-	•	Repeatable audio tests on macOS
-
-##	2.	Functional Specification (FS)
-	•	What must exist (modes, outputs, acceptance criteria)
-
-##	3.	Technical Specification (TS)
-	•	Exact contracts (CLI, debug formats, timing model, command subsets)
-
-##	4.	Test harness
-	•	Beep/noise/sequence/chords/sweep tests + counters + dumps
-
-##	5.	Release
-	•	Known-good tagged states, rollback-friendly
-	•	v0.06 adds stable VGM playback + strict debug contracts
-
-This approach keeps the code Copilot-checkable: the spec is explicit enough that implementations don’t need guesswork.
-
-⸻
-
-# Credits / references
-	•	SN76489 PSG behavior: community knowledge + classic chip documentation conventions.
-	•	Python audio backend: sounddevice (PortAudio).
-	•	MIDI backend: python-rtmidi (CoreMIDI on macOS).
-	•	<b>Michiel Erasmus</b> for iterative test-driven feedback loops and ruthless sanity checks.
+# Credits
+ - Idea, execution: Michiel Erasmus
+ 
