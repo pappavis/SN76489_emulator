@@ -157,7 +157,7 @@ Possible follow-ups include:
 
 See the main repository <a href="./docs/quick_setup_install.md">README</a> for the current roadmap.
 
-<img src="./img/sn76489_howto_run.jpg" width="50%" height="50%">
+<img src="./img/sn76489_howto_run.jpg" width="70%" height="70%">
 
 
 
