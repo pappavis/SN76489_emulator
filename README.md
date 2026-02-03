@@ -87,6 +87,8 @@ Wait for the code to be generated.
 - Install dependencies as instructed
 - Run the generated script
 
+<imgr src="./img/example_seqeunce_onliner.png">
+
 If the specification was followed correctly:
 - audio will play
 - tests will pass
