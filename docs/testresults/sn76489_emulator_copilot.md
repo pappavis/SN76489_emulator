@@ -112,3 +112,229 @@ git commit -m "v0.07: add instrument profiles, velocity curves, voice-alloc mode
 
 Laat weet as ek die **voorbeeld-instrument JSON** moet bysit of die **sanity-check checklist** vir v0.07 moet uitbrei met dry-run en state save/load gevalle.
 
+
+
+
+A3F9C7B1
+
+Lekker — jy het nou:
+
+```bash
+python3 sn76489_emulator.py --test beep
+```
+
+Dit is **die korrekte kommando** om die nuwe **v0.07** implementasie te toets. Hier is wat **moet gebeur** wanneer jy dit run:
+
+***
+
+# ✅ Wat jy behoort te sien
+
+### **1. RUN CONFIG blok**
+
+Dit druk al die parameters, insluitend die nuwe TS v1.6-sleutels:
+
+    RUN CONFIG:
+    mode=test
+    test=beep
+    sample_rate=44100
+    block_frames=512
+    chips=1
+    pan=both
+    master_gain=0.25
+    attack_ms=5.0
+    decay_ms=60.0
+    sustain_vol=8
+    release_ms=180.0
+    noise_mode=white
+    noise_rate=div32
+    noise_seed=0x4000
+    midi_in=0
+    midi_port=none
+    vgm_path=none
+    vgm_base_dir=none
+    vgm_loop=0
+    vgm_speed=1.0
+    dump_regs=0
+    counters=0
+    debug=0
+    instrument=default
+    voice_alloc=first_free
+    vel_curve=linear
+    sustain=0
+    dry_run=0
+    debug_latency=0
+    save_state=none
+    load_state=none
+
+### **2. Hoorbare 440 Hz "beep"**
+
+Die test harness doen:
+
+*   Bereken periode vir 440 Hz
+*   Batch-write:
+    *   tone0 → 440 Hz
+    *   vol0 → 2 (≈ *hard, helder beep*)
+*   Render vir `--seconds` (default 2 sekondes)
+
+***
+
+# 🔊 Geen klank gehoor?
+
+Hier is die drie mees algemene redes *tydens MAC uitvoering*:
+
+### **1. sounddevice nie beskikbaar?**
+
+Run:
+
+```bash
+python3 - << 'EOF'
+import sounddevice as sd
+print(sd.query_devices())
+EOF
+```
+
+As dit faal → installeer:
+
+```bash
+pip install sounddevice numpy
+```
+
+### **2. ‘device busy’ (CoreAudio)**
+
+*   Probeer die Mac herstart
+*   Maak Chrome tabs toe wat audio hou
+*   Probeer:
+
+```bash
+python3 sn76489_emulator.py --test beep --block-frames 256
+```
+
+### **3. Volume te laag**
+
+Gebruik `--master-gain`:
+
+```bash
+python3 sn76489_emulator.py --test beep --master-gain 0.8
+```
+
+***
+
+# 🎧 Opsioneel: Debug / regs-dump
+
+```bash
+python3 sn76489_emulator.py --test beep --dump-regs
+```
+
+Jy sal sien:
+
+    chip=0
+    latched=R0
+    R0=2 R1=0 R2=... etc
+    tone0_hz=440.22 ...
+    noise_mode=white
+    ...
+
+***
+
+# 🔍 Wil jy hê ek moet:
+
+1.  **Bevestig of die beep korrek gegenereer is op jou masjien?**
+2.  **Help troubleshoot as jy geen klank hoor nie?**
+3.  **Direk 'n klein instrument JSON voorbeeld toks maak (bv. chip\_lead.json)?**
+
+Laat weet — ek is reg!
+
+
+A3F9C7B1
+
+Hier is ’n **geldige, voorstel-klaar** instrument JSON‑lêer wat perfek aansluit by **v0.07** en **TS v1.6**.  
+Dit is geskik vir `instruments/chip_lead.json`.
+
+***
+
+# 🎹 **Voorbeeld: `chip_lead.json`**
+
+```json
+{
+  "name": "chip_lead",
+  "volume_curve": "linear",
+  "attack_ms": 4.0,
+  "decay_ms": 60.0,
+  "sustain_vol": 7,
+  "release_ms": 150.0,
+  "detune_cents": 0.0,
+  "bend_range_semitones": 2.0
+}
+```
+
+***
+
+# 📘 Uitleg van die waardes
+
+### **name**
+
+Die interne naam wat in `RUN CONFIG` weerspieël word wanneer jy `--instrument chip_lead` gebruik.
+
+### **volume\_curve**
+
+Ondersteunde curves:
+
+*   `linear`
+*   `soft`
+*   `hard`
+*   `log`
+
+Dit beïnvloed hoe MIDI‑velocity → 4‑bit volume gemap word.
+
+### **ADSR parameters**
+
+*(Emuleer nie ’n DSP‑envelope nie; stuur net volume‑register writes volgens jou engine‑model.)*
+
+*   **attack\_ms:** Hoe vinnig die volume oplig na ’n Note On
+*   **decay\_ms:** Hoe vinnig dit sak tot sustain
+*   **sustain\_vol:** 0–15 (maar 8 = “musikaal bruikbaar”)
+*   **release\_ms:** Saktempo na Note Off
+
+### **detune\_cents**
+
+0 = geen detune  
+Positiewe waardes maak toon hoër, negatiewe laer (deur periode effens te verander).
+
+### **bend\_range\_semitones**
+
+Hoe groot ’n MIDI pitch‑bend die toon mag skuif (± semitone‑reeks).
+
+***
+
+# 🎵 Opsionele “warm pad” instrument
+
+As jy ’n alternatief wil hê:
+
+```json
+{
+  "name": "warm_pad",
+  "volume_curve": "soft",
+  "attack_ms": 40.0,
+  "decay_ms": 120.0,
+  "sustain_vol": 10,
+  "release_ms": 300.0,
+  "detune_cents": 3.5,
+  "bend_range_semitones": 1.0
+}
+```
+
+***
+
+# 📂 Waar om die lêer te plaas
+
+    instruments/chip_lead.json
+
+Dan gebruik jy dit so:
+
+```bash
+python3 sn76489_emulator.py --test chords --instrument chip_lead
+```
+
+***
+
+Wil jy hê ek moet **3–5 standaard instrumente** saamstel (lead, bass, pad, arpeggio, noise-drum)?
