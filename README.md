@@ -94,15 +94,8 @@ If the specification was followed correctly:
 - tests will pass
 - debug output will match the contract
 
-```bash
-(venv3.12) michiele@KodeklopperM4.local src % source ./smoketest.sh                                                                                12:21:21
-Starting smoketest for SN76489 emulator...
-RUN CONFIG:
-mode=test
-test=beep
-sample_rate=44100
-block_frames=512
-```
+<img src="./img/smoketest1.png">
+
 
 ---
 
