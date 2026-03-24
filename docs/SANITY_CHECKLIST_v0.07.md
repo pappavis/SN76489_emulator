@@ -19,3 +19,19 @@ python sn76489_emulator.py --vgm-path "/path/to/song.vgm" --counters --dump-regs
 python sn76489_emulator.py --vgm-path "/path/to/song.vgm" --vgm-loop --vgm-speed 0.5
 python sn76489_emulator.py --vgm-path "/path/to/song.vgm" --vgm-loop --vgm-speed 2.0
 ```
+
+
+ja graag!
+```
+24-mrt-2026 17:10
+één finale code-patch ronde op die huidige sn76489_emulator_v007.py, gefokus op:
+	•	render/mixer robuustheid
+	•	counters korrektheid
+	•	finale cleanup vir release
+
+Dan gee ek jou daarna:
+	•	die gepatchte finale code
+	•	’n release README
+	•	’n finale sanity checklist
+	•	en ’n recommended tag/commit flow.
+```
