@@ -1,10 +1,22 @@
-
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 SN76489 Emulator v0.07
 macOS / Python 3.12
 Single-file implementation
+
+Features:
+- SN76489 core: 3 tone + 1 noise
+- Multi-chip engine (1..128)
+- Stereo routing: global pan + per-voice pan
+- ADSR-lite envelope via register-style volume steps
+- Voice allocation + deterministic voice stealing
+- Velocity curves: linear / log / exp
+- Sustain pedal (CC64)
+- Pitch bend (+/- 2 semitone)
+- MIDI input via python-rtmidi
+- VGM playback subset
+- Stable RUN CONFIG / dump-regs / counters / debug
 
 Dependencies:
     pip install numpy sounddevice
@@ -24,6 +36,7 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
+
 DEFAULT_SAMPLE_RATE = 44100
 DEFAULT_BLOCK_FRAMES = 512
 DEFAULT_MASTER_GAIN = 0.25
@@ -33,6 +46,10 @@ DEFAULT_VGM_BASE_DIR = (
     "KiCAD/github/SN76489-synth-midi/src/tmp/src/"
 )
 
+
+# -----------------------------
+# Helpers
+# -----------------------------
 
 def hard_fail(msg: str, code: int = 2) -> None:
     print(f"ERROR: {msg}")
@@ -68,19 +85,21 @@ def period_to_freq(period: int, clock_hz: float) -> float:
 
 
 def vol4_to_amp(vol: int) -> float:
+    # 0 loudest, 15 silent
     v = clamp_int(vol, 0, 15)
     if v >= 15:
         return 0.0
     return float(2.0 ** (-(v / 2.0)))
 
 
+# -----------------------------
+# Config / counters
+# -----------------------------
+
 @dataclass
 class Config:
     mode: str = "test"
     test: str = "beep"
-
-    seconds: float = 1.0
-    freq: float = 440.0
 
     sample_rate: int = DEFAULT_SAMPLE_RATE
     block_frames: int = DEFAULT_BLOCK_FRAMES
@@ -165,12 +184,19 @@ class Voice:
     release_interval_blocks: int = 1
 
 
+# -----------------------------
+# SN76489 chip
+# -----------------------------
+
 class SN76489Chip:
     def __init__(self, chip_id: int, sample_rate: int, clock_hz: float = DEFAULT_SN_CLOCK_HZ):
         self.chip_id = chip_id
         self.sample_rate = int(sample_rate)
         self.clock_hz = float(clock_hz)
 
+        # Logical registers:
+        # 0 tone0 period, 1 vol0, 2 tone1 period, 3 vol1,
+        # 4 tone2 period, 5 vol2, 6 noise ctrl, 7 noise vol
         self.regs: List[int] = [0] * 8
         self.regs[0] = 0x3FF
         self.regs[1] = 15
@@ -182,11 +208,14 @@ class SN76489Chip:
         self.regs[7] = 15
 
         self.latched_reg: int = 0
+
         self.tone_phase = [0, 0, 0]
         self.tone_counter = [0.0, 0.0, 0.0]
+
         self.noise_lfsr = 0x4000
         self.noise_out = 1
         self.noise_counter = 0.0
+
         self.counters = ChipCounters()
 
     def set_noise_seed(self, seed: int) -> None:
@@ -196,11 +225,13 @@ class SN76489Chip:
     def write_byte(self, b: int) -> None:
         b &= 0xFF
         self.counters.writes_total += 1
+
         if (b & 0x80) != 0:
             self.counters.writes_latch += 1
             reg = (b >> 4) & 0x07
             data = b & 0x0F
             self.latched_reg = reg
+
             if reg in (0, 2, 4):
                 cur = self.regs[reg] & 0x3F0
                 self.regs[reg] = cur | data
@@ -254,11 +285,8 @@ class SN76489Chip:
             return float(self.sample_rate)
         return max(1.0, (1.0 / f) * self.sample_rate)
 
-    def render_split(self, nframes: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        out0 = np.zeros((nframes,), dtype=np.float32)
-        out1 = np.zeros((nframes,), dtype=np.float32)
-        out2 = np.zeros((nframes,), dtype=np.float32)
-        outn = np.zeros((nframes,), dtype=np.float32)
+    def render_mono(self, nframes: int) -> np.ndarray:
+        out = np.zeros((nframes,), dtype=np.float32)
 
         a0 = vol4_to_amp(self.regs[1])
         a1 = vol4_to_amp(self.regs[3])
@@ -280,9 +308,9 @@ class SN76489Chip:
                     self.tone_counter[idx] += step
                     self.tone_phase[idx] ^= 1
 
-            out0[i] = (1.0 if self.tone_phase[0] else -1.0) * a0
-            out1[i] = (1.0 if self.tone_phase[1] else -1.0) * a1
-            out2[i] = (1.0 if self.tone_phase[2] else -1.0) * a2
+            s0 = (1.0 if self.tone_phase[0] else -1.0) * a0
+            s1 = (1.0 if self.tone_phase[1] else -1.0) * a1
+            s2 = (1.0 if self.tone_phase[2] else -1.0) * a2
 
             self.noise_counter -= 1.0
             if self.noise_counter <= 0.0:
@@ -294,19 +322,18 @@ class SN76489Chip:
                 self.noise_lfsr = ((self.noise_lfsr >> 1) | (fb << 14)) & 0x7FFF
                 self.noise_out = self.noise_lfsr & 0x01
 
-            outn[i] = (1.0 if self.noise_out else -1.0) * an
+            sn = (1.0 if self.noise_out else -1.0) * an
+            out[i] = (s0 + s1 + s2 + sn)
 
-        # same internal scaling as previous versions
-        scale = 0.25
-        out0 *= scale
-        out1 *= scale
-        out2 *= scale
-        outn *= scale
-
+        out *= 0.25
         self.counters.renders += 1
         self.counters.frames += nframes
-        return out0, out1, out2, outn
+        return out
 
+
+# -----------------------------
+# Engine
+# -----------------------------
 
 class Engine:
     def __init__(self, cfg: Config):
@@ -333,6 +360,8 @@ class Engine:
             chip.set_noise_seed(cfg.noise_seed)
             chip.set_noise_ctrl(cfg.noise_mode, cfg.noise_rate)
 
+    # ---------- debug helpers ----------
+
     def debug(self, line: str) -> None:
         if not self.cfg.debug:
             return
@@ -344,6 +373,8 @@ class Engine:
             return
         self._debug_lines_this_second += 1
         print(f"DEBUG: {line}")
+
+    # ---------- run config ----------
 
     def print_run_config(self) -> None:
         c = self.cfg
@@ -374,6 +405,8 @@ class Engine:
         print(f"counters={1 if c.counters else 0}")
         print(f"debug={1 if c.debug else 0}")
 
+    # ---------- timing helpers ----------
+
     def block_duration_ms(self) -> float:
         return (self.cfg.block_frames / self.cfg.sample_rate) * 1000.0
 
@@ -381,6 +414,8 @@ class Engine:
         if ms <= 0.0:
             return 1
         return max(1, int(math.ceil(ms / self.block_duration_ms())))
+
+    # ---------- curves / period ----------
 
     def velocity_to_volume(self, velocity: int) -> int:
         velocity = clamp_int(velocity, 1, 127)
@@ -406,9 +441,13 @@ class Engine:
         bent_freq = base_freq * (2.0 ** (offset / 12.0))
         return freq_to_period(bent_freq, DEFAULT_SN_CLOCK_HZ)
 
+    # ---------- pan helpers ----------
+
     def default_voice_pan(self, voice_id: int) -> str:
-        if self.cfg.voice_pan == "center":
+        mode = self.cfg.voice_pan
+        if mode == "center":
             return "both"
+        # default == spread
         return {0: "left", 1: "both", 2: "right"}[voice_id]
 
     def effective_voice_pan(self, voice_pan: str) -> str:
@@ -425,11 +464,15 @@ class Engine:
             return (0.0, 1.0)
         return (1.0, 1.0)
 
+    # ---------- note mapping ----------
+
     def chip_for_channel(self, midi_channel: int) -> int:
         return (midi_channel - 1) % self.cfg.chips
 
     def note_key(self, midi_channel: int, midi_note: int, chip_id: int) -> Tuple[int, int, int]:
         return (midi_channel, midi_note, chip_id)
+
+    # ---------- voice allocation ----------
 
     def find_free_voice(self, chip_id: int) -> Optional[Voice]:
         for v in self.voices[chip_id]:
@@ -466,13 +509,10 @@ class Engine:
         free = self.find_free_voice(chip_id)
         if free is not None:
             return chip_id, free
+        self.engine_counters.note_ignored_no_voice += 0  # explicit no-op for compatibility
         return chip_id, self.select_voice_to_steal(chip_id)
 
-    def remove_voice_mapping(self, chip_id: int, v: Voice) -> None:
-        if v.midi_note is None or v.midi_channel is None:
-            return
-        key = self.note_key(v.midi_channel, v.midi_note, chip_id)
-        self.active_notes.pop(key, None)
+    # ---------- envelope init/update ----------
 
     def init_envelope_for_voice(self, v: Voice, target_volume: int) -> None:
         v.phase = "ATTACK"
@@ -480,20 +520,19 @@ class Engine:
         v.target_volume = target_volume
         v.envelope_target_volume = target_volume
         v.envelope_step_counter = 0
-        attack_steps = max(1, 15 - target_volume)
-        sustain_diff = max(1, abs(self.cfg.sustain_vol - target_volume))
-        release_steps = max(1, 15 - self.cfg.sustain_vol)
-        v.attack_interval_blocks = max(1, math.ceil(self.blocks_for_ms(self.cfg.attack_ms) / attack_steps))
-        v.decay_interval_blocks = max(1, math.ceil(self.blocks_for_ms(self.cfg.decay_ms) / sustain_diff))
-        v.release_interval_blocks = max(1, math.ceil(self.blocks_for_ms(self.cfg.release_ms) / release_steps))
+        v.attack_interval_blocks = max(1, self.blocks_for_ms(self.cfg.attack_ms) // max(1, 15 - target_volume))
+        sustain_diff = abs(self.cfg.sustain_vol - target_volume)
+        v.decay_interval_blocks = max(1, self.blocks_for_ms(self.cfg.decay_ms) // max(1, sustain_diff if sustain_diff > 0 else 1))
+        release_diff = max(1, 15 - self.cfg.sustain_vol)
+        v.release_interval_blocks = max(1, self.blocks_for_ms(self.cfg.release_ms) // release_diff)
         v.sustain_hold = False
 
     def update_voice_envelope(self, chip_id: int, v: Voice) -> None:
         if not v.active:
             return
 
-        chip = self.chips[chip_id]
         v.envelope_step_counter += 1
+        chip = self.chips[chip_id]
 
         if v.phase == "ATTACK":
             if v.envelope_step_counter >= v.attack_interval_blocks:
@@ -517,6 +556,7 @@ class Engine:
                     v.current_volume = min(self.cfg.sustain_vol, v.current_volume + 1)
                 elif v.current_volume > self.cfg.sustain_vol:
                     v.current_volume = max(self.cfg.sustain_vol, v.current_volume - 1)
+
                 if v.current_volume != old:
                     chip.set_tone_volume(v.voice_id, v.current_volume)
                     self.engine_counters.envelope_steps_total += 1
@@ -527,6 +567,7 @@ class Engine:
                     v.phase = "SUSTAIN"
 
         elif v.phase == "SUSTAIN":
+            # steady
             pass
 
         elif v.phase == "RELEASE":
@@ -541,18 +582,17 @@ class Engine:
                         f"ENVELOPE_STEP chip={chip_id} voice={v.voice_id} phase=RELEASE old={old} new={v.current_volume}"
                     )
                 if v.current_volume >= 15:
-                    self.remove_voice_mapping(chip_id, v)
-                    self.debug(f"VOICE_IDLE chip={chip_id} voice={v.voice_id}")
                     v.phase = "IDLE"
                     v.active = False
                     v.midi_note = None
                     v.midi_channel = None
                     v.velocity = 0
                     v.sustain_hold = False
-                    v.pitch_bend_value = 8192
-                    v.current_period = 0x3FF
-                    v.base_period = 0x3FF
-                    v.pan = self.default_voice_pan(v.voice_id)
+
+        elif v.phase == "IDLE":
+            pass
+
+    # ---------- MIDI event handlers ----------
 
     def handle_note_on(self, midi_channel: int, midi_note: int, velocity: int) -> None:
         self.engine_counters.midi_events_total += 1
@@ -563,12 +603,15 @@ class Engine:
             return
 
         chip_id, v = self.allocate_voice(midi_channel, midi_note, velocity)
+        key = self.note_key(midi_channel, midi_note, chip_id)
 
-        # If reusing/stolen voice, remove old mapping first
-        if v.active:
-            self.remove_voice_mapping(chip_id, v)
+        # If stealing, remove old mapping
+        if v.active and v.midi_note is not None and v.midi_channel is not None:
+            old_key = self.note_key(v.midi_channel, v.midi_note, chip_id)
+            self.active_notes.pop(old_key, None)
 
         self.alloc_counter += 1
+        v.voice_id = v.voice_id
         v.midi_note = midi_note
         v.midi_channel = midi_channel
         v.velocity = velocity
@@ -586,10 +629,8 @@ class Engine:
         chip.set_tone_period(v.voice_id, v.current_period)
         chip.set_tone_volume(v.voice_id, v.current_volume)
 
-        key = self.note_key(midi_channel, midi_note, chip_id)
         self.active_notes[key] = v.voice_id
         self.engine_counters.voices_used_total += 1
-
         self.debug(
             f"VOICE_ASSIGN chip={chip_id} voice={v.voice_id} ch={midi_channel} note={midi_note} "
             f"vel={velocity} period={v.current_period} vol={v.current_volume}"
@@ -602,6 +643,7 @@ class Engine:
         chip_id = self.chip_for_channel(midi_channel)
         key = self.note_key(midi_channel, midi_note, chip_id)
         voice_id = self.active_notes.get(key)
+
         if voice_id is None:
             return
 
@@ -618,8 +660,20 @@ class Engine:
     def handle_pitch_bend(self, midi_channel: int, raw_value: int) -> None:
         self.engine_counters.midi_events_total += 1
         self.engine_counters.pitch_bend_events_total += 1
-        self.pitch_bend_by_channel[midi_channel] = clamp_int(raw_value, 0, 16383)
-        offset = self.pitch_bend_to_offset(self.pitch_bend_by_channel[midi_channel])
+
+        raw_value = clamp_int(raw_value, 0, 16383)
+        self.pitch_bend_by_channel[midi_channel] = raw_value
+        chip_id = self.chip_for_channel(midi_channel)
+
+        for v in self.voices[chip_id]:
+            if v.active and v.midi_channel == midi_channel and v.midi_note is not None:
+                v.pitch_bend_value = raw_value
+                new_period = self.bent_period_for_note(v.midi_note, raw_value)
+                if new_period != v.current_period:
+                    v.current_period = new_period
+                    self.chips[chip_id].set_tone_period(v.voice_id, v.current_period)
+
+        offset = self.pitch_bend_to_offset(raw_value)
         self.debug(f"PITCH_BEND_UPDATE ch={midi_channel} raw={raw_value} semitone_offset={offset:.4f}")
 
     def handle_cc64(self, midi_channel: int, value: int) -> None:
@@ -637,24 +691,52 @@ class Engine:
                     self.engine_counters.sustain_release_events_total += 1
                     self.debug(f"SUSTAIN_RELEASE chip={chip_id} voice={v.voice_id} ch={midi_channel}")
 
+    # ---------- per-block engine update ----------
+
     def update_block_state(self) -> None:
         for chip_id in range(self.cfg.chips):
             for v in self.voices[chip_id]:
                 if v.active and v.midi_note is not None and v.midi_channel is not None:
+                    # pitch bend at block boundaries
                     new_period = self.bent_period_for_note(v.midi_note, self.pitch_bend_by_channel[v.midi_channel])
                     if new_period != v.current_period:
                         v.current_period = new_period
                         self.chips[chip_id].set_tone_period(v.voice_id, v.current_period)
                 self.update_voice_envelope(chip_id, v)
 
+    # ---------- render ----------
+
     def render_stereo_block(self, frames: int) -> np.ndarray:
         left = np.zeros((frames,), dtype=np.float32)
         right = np.zeros((frames,), dtype=np.float32)
 
         for chip_id, chip in enumerate(self.chips):
-            t0, t1, t2, nz = chip.render_split(frames)
-            tone_blocks = [t0, t1, t2]
+            tone_blocks = [np.zeros((frames,), dtype=np.float32) for _ in range(3)]
 
+            # Temporarily isolate tone voices by muting others one at a time
+            original_vols = [chip.regs[1], chip.regs[3], chip.regs[5], chip.regs[7]]
+
+            # render each tone voice separately for per-voice pan
+            for voice_id in range(3):
+                chip.regs[1], chip.regs[3], chip.regs[5], chip.regs[7] = 15, 15, 15, 15
+                chip.regs[[1, 3, 5][voice_id]] = original_vols[[1, 3, 5][voice_id] // 2] if False else original_vols[[1, 3, 5][voice_id] // 2]
+                # easier explicit:
+                if voice_id == 0:
+                    chip.regs[1] = original_vols[0]
+                elif voice_id == 1:
+                    chip.regs[3] = original_vols[1]
+                else:
+                    chip.regs[5] = original_vols[2]
+                tone_blocks[voice_id] = chip.render_mono(frames)
+
+            # render noise separately
+            chip.regs[1], chip.regs[3], chip.regs[5], chip.regs[7] = 15, 15, 15, original_vols[3]
+            noise_block = chip.render_mono(frames)
+
+            # restore
+            chip.regs[1], chip.regs[3], chip.regs[5], chip.regs[7] = original_vols
+
+            # route tone voices
             for voice_id, mono in enumerate(tone_blocks):
                 v = self.voices[chip_id][voice_id]
                 pan = self.effective_voice_pan(v.pan)
@@ -662,19 +744,21 @@ class Engine:
                 left += mono * gl
                 right += mono * gr
 
-            # noise uses global pan only
+            # route noise using global pan only
             if self.cfg.pan == "left":
-                left += nz
+                left += noise_block
             elif self.cfg.pan == "right":
-                right += nz
+                right += noise_block
             else:
-                left += nz
-                right += nz
+                left += noise_block
+                right += noise_block
 
         stereo = np.stack([left, right], axis=1)
         stereo *= float(self.cfg.master_gain)
         np.clip(stereo, -1.0, 1.0, out=stereo)
         return stereo.astype(np.float32, copy=False)
+
+    # ---------- audio backend ----------
 
     def open_stream(self):
         try:
@@ -707,6 +791,8 @@ class Engine:
                 pass
             self._sd_stream = None
 
+    # ---------- dump / counters ----------
+
     def dump_regs(self):
         for chip in self.chips:
             r = chip.regs
@@ -722,6 +808,7 @@ class Engine:
             nr = {0: "div16", 1: "div32", 2: "div64", 3: "tone2"}[r[6] & 0x03]
             nm = "white" if ((r[6] >> 2) & 1) else "periodic"
             print(f"  noise_mode={nm} noise_rate={nr} noise_seed={hex_seed(chip.noise_lfsr)}")
+
             for v in self.voices[chip.chip_id]:
                 print(
                     f"  voice_id={v.voice_id} midi_note={v.midi_note} midi_channel={v.midi_channel} "
@@ -760,35 +847,37 @@ class Engine:
         print(f"  vgm_wait_samples_total={ec.vgm_wait_samples_total}")
         print(f"  vgm_loops_total={ec.vgm_loops_total}")
 
-    def run_test(self):
+    # ---------- tests ----------
+
+    def run_test(self, seconds: float, freq: float):
         test = self.cfg.test
         self.open_stream()
         try:
             if test == "beep":
-                self._test_beep()
+                self._test_beep(seconds, freq)
             elif test == "noise":
-                self._test_noise()
+                self._test_noise(seconds)
             elif test == "sequence":
-                self._test_sequence()
+                self._test_sequence(seconds)
             elif test == "chords":
-                self._test_chords()
+                self._test_chords(seconds)
             elif test == "sweep":
-                self._test_sweep()
+                self._test_sweep(seconds)
             else:
                 hard_fail("Unknown test mode.")
         finally:
             self.close_stream()
 
-    def _test_beep(self):
+    def _test_beep(self, seconds: float, freq: float):
         chip = self.chips[0]
-        chip.set_tone_period(0, freq_to_period(self.cfg.freq, DEFAULT_SN_CLOCK_HZ))
+        chip.set_tone_period(0, freq_to_period(freq, DEFAULT_SN_CLOCK_HZ))
         chip.set_tone_volume(0, 2)
         chip.set_tone_volume(1, 15)
         chip.set_tone_volume(2, 15)
         chip.regs[7] = 15
-        time.sleep(self.cfg.seconds)
+        time.sleep(seconds)
 
-    def _test_noise(self):
+    def _test_noise(self, seconds: float):
         chip = self.chips[0]
         chip.set_noise_ctrl(self.cfg.noise_mode, self.cfg.noise_rate)
         chip.set_noise_seed(self.cfg.noise_seed)
@@ -796,36 +885,38 @@ class Engine:
         chip.regs[3] = 15
         chip.regs[5] = 15
         chip.regs[7] = 2
-        time.sleep(self.cfg.seconds)
+        time.sleep(seconds)
 
-    def _test_sequence(self):
+    def _test_sequence(self, seconds: float):
         notes = [(60, 100), (64, 80), (67, 120), (72, 90)]
-        step = max(0.08, self.cfg.seconds / max(1, len(notes)))
+        step = max(0.08, seconds / max(1, len(notes)))
         for n, vel in notes:
             self.handle_note_on(1, n, vel)
             time.sleep(step / 2)
             self.handle_note_off(1, n)
             time.sleep(step / 2)
 
-    def _test_chords(self):
+    def _test_chords(self, seconds: float):
         self.handle_note_on(1, 60, 110)
         self.handle_note_on(1, 64, 100)
         self.handle_note_on(1, 67, 120)
-        time.sleep(self.cfg.seconds)
+        time.sleep(seconds)
         self.handle_note_off(1, 60)
         self.handle_note_off(1, 64)
         self.handle_note_off(1, 67)
-        time.sleep(min(0.5, self.cfg.seconds / 2))
+        time.sleep(min(0.5, seconds / 2))
 
-    def _test_sweep(self):
+    def _test_sweep(self, seconds: float):
         start = time.time()
         self.handle_note_on(1, 57, 110)
-        while time.time() - start < self.cfg.seconds:
-            t = (time.time() - start) / max(self.cfg.seconds, 0.001)
+        while time.time() - start < seconds:
+            t = (time.time() - start) / max(seconds, 0.001)
             bend = int(8192 + (math.sin(t * math.pi) * 8191))
             self.handle_pitch_bend(1, bend)
             time.sleep(self.block_duration_ms() / 1000.0)
         self.handle_note_off(1, 57)
+
+    # ---------- MIDI ----------
 
     def midi_list(self):
         try:
@@ -869,7 +960,9 @@ class Engine:
                         status = data[0] & 0xF0
                         ch = (data[0] & 0x0F) + 1
                         if status == 0x90:
-                            self.handle_note_on(ch, data[1], data[2])
+                            note = data[1]
+                            vel = data[2]
+                            self.handle_note_on(ch, note, vel)
                         elif status == 0x80:
                             self.handle_note_off(ch, data[1])
                         elif status == 0xE0:
@@ -886,6 +979,8 @@ class Engine:
                 mi.close_port()
             except Exception:
                 pass
+
+    # ---------- VGM ----------
 
     def vgm_list(self):
         base = os.path.expanduser(self.cfg.vgm_base_dir)
@@ -989,10 +1084,13 @@ class Engine:
 
         remaining = effective
         while remaining > 0:
-            step = min(self.cfg.block_frames, remaining)
-            time.sleep(step / self.cfg.sample_rate)
-            remaining -= step
+            time.sleep(min(self.cfg.block_frames, remaining) / self.cfg.sample_rate)
+            remaining -= min(self.cfg.block_frames, remaining)
 
+
+# -----------------------------
+# CLI
+# -----------------------------
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="sn76489_emulator.py")
@@ -1071,6 +1169,7 @@ def cfg_from_args(args: argparse.Namespace, mode: str, test: str) -> Config:
     chips = clamp_int(args.chips, 1, 128)
     if chips != args.chips:
         hard_fail("--chips must be in range 1..128")
+
     if args.vgm_speed <= 0:
         hard_fail("--vgm-speed must be > 0.")
     if args.noise_rate not in ("div16", "div32", "div64", "tone2"):
@@ -1079,8 +1178,6 @@ def cfg_from_args(args: argparse.Namespace, mode: str, test: str) -> Config:
     return Config(
         mode=mode,
         test=test,
-        seconds=float(args.seconds),
-        freq=float(args.freq),
         sample_rate=clamp_int(args.sample_rate, 8000, 192000),
         block_frames=clamp_int(args.block_frames, 64, 8192),
         chips=chips,
@@ -1126,7 +1223,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         elif mode == "vgm":
             eng.run_vgm()
         elif mode == "test":
-            eng.run_test()
+            eng.run_test(cfg.seconds if hasattr(cfg, "seconds") else args.seconds, args.freq)
         else:
             hard_fail(f"Unknown mode: {mode}")
     finally:
@@ -1140,3 +1237,4 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
